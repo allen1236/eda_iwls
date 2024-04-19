@@ -6,6 +6,7 @@ import cgi
 import subprocess as sp
 import re
 from datetime import datetime
+from env import PATH_ABC
 
 def removeEsc( text ):
     ansi_escape = re.compile(r'''
@@ -95,7 +96,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             print(cmd)
             out = ""
             try:
-                out = run_command( ['abc', '-c', cmd] )
+                out = run_command( [PATH_ABC, '-c', cmd] )
                 print(out)
             except :
                 return (True, "Can't open file with ABC")
@@ -110,6 +111,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if node < best:
                     data[bm] = (node, id, datetime.now().strftime("%Y-%m-%d %H:%M:%S") )
                     writeCsv(FNAME_SCORE)
+                    run_command( ['cp', '-f', f'{fname}', f'best' ] )
                     return (True, f"Network is equivalent. The AIG size is {node}. You are now the current best in this case.")
                 else:
                     return (True, f"Network is equivalent. The AIG size is {node}. The current best is {best} by {data[bm][1]} at {data[bm][2]}.")
