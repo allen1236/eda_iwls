@@ -99,7 +99,7 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 out = run_command( [PATH_ABC, '-c', cmd] )
                 print(out)
             except :
-                return (True, "Can't open file with ABC")
+                return (True, "Failed to run ABC")
 
             best = data[bm][0]
             eq = out.find("Networks are equivalent") != -1
