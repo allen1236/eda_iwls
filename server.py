@@ -1,5 +1,6 @@
 #!/usr/env python3
 import http.server
+import json
 import socketserver
 import io
 import cgi
@@ -24,11 +25,29 @@ def removeEsc( text ):
     return result
 
 def run_command(command, timeout=None):
-    try:
-        out = sp.check_output( command, text=True, timeout=timeout )
-        return out
-    except:
-        return ""
+    out = sp.check_output( command, text=True, timeout=timeout )
+    return out
+
+def calculatePoint(data):
+
+    counts = dict()
+    for _, id, _ in data:
+        if id != "baseline":
+            counts[id] = counts.get(id, 0) + 1
+            if counts[id] > 5:
+                counts[id] = 5
+
+    points = [[],[],[],[],[],[]]
+    for id, point in counts.items():
+        points[point].append(id)
+
+    res = []
+    for i in range(5, 0, -1):
+        for id in points[i]:
+            res.append( (id, i) )
+    print(res)
+    return res
+
 
 # Change this to serve on a different port
 PORT = 44444
@@ -43,7 +62,6 @@ with open(FNAME_SCORE, 'r') as f:
         toks = line.strip().split(',')
         assert( len(data) == int(toks[0]) )
         data.append( ( int(toks[1]), toks[2], toks[3] ) )
-print(data)
 
 def writeCsv( fname ):
     with open(fname, 'w+') as f:
@@ -53,16 +71,32 @@ def writeCsv( fname ):
 
 class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
+    def do_GET(self):
+
+        f = io.BytesIO()
+        f.write(json.dumps({"score": data, "student": calculatePoint(data)}).encode('utf-8'))
+        length = f.tell()
+        f.seek(0)
+        self.send_response(200)
+        self.send_header("Content-type", "application/json")
+        self.send_header("Content-Length", str(length))
+        self.send_header("Access-Control-Allow-Origin", f"{CORS_ORIGIN}")
+        self.end_headers()
+        if f:
+            self.copyfile(f, self.wfile)
+            f.close()      
+
+
     def do_POST(self):        
         r, info = self.deal_post_data()
         print(r, info, "by: ", self.client_address)
         f = io.BytesIO()
-        msg = f"{info}\n"
-        f.write(msg.encode('utf-8'))
+        msg = f"{info}"
+        f.write(json.dumps({'msg': msg}).encode('utf-8'))
         length = f.tell()
         f.seek(0)
         self.send_response(200)
-        self.send_header("Content-type", "text/plain")
+        self.send_header("Content-type", "application/json")
         self.send_header("Content-Length", str(length))
         self.send_header("Access-Control-Allow-Origin", f"{CORS_ORIGIN}")
         self.end_headers()
@@ -109,12 +143,12 @@ class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             node = int(removeEsc(out[node+5:].strip()).split()[0])
             if eq:
                 if node < best:
-                    data[bm] = (node, id, datetime.now().strftime("%Y-%m-%d %H:%M:%S") )
+                    data[bm] = (node, id, datetime.now().strftime("%Y/%m/%d %H:%M:%S") )
                     writeCsv(FNAME_SCORE)
-                    run_command( ['cp', '-f', f'{fname}', f'best' ] )
-                    return (True, f"Network is equivalent. The AIG size is {node}. You are now the current best in this case.")
+                    run_command( ['cp', '-f', f'{fname}', f'best/{bm:02d}.aig' ] )
+                    return (True, f"Network is equivalent. The AIG size is {node}.\nYou are now the current best in this case.")
                 else:
-                    return (True, f"Network is equivalent. The AIG size is {node}. The current best is {best} by {data[bm][1]} at {data[bm][2]}.")
+                    return (True, f"Network is equivalent. The AIG size is {node}.\nThe current best is {best} by {data[bm][1]} at {data[bm][2]}.")
             else:
                 return (True, f"Network is not equivalent.")
 
